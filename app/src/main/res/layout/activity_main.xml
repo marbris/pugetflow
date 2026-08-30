@@ -48,6 +48,12 @@
             android:layout_height="wrap_content"
             android:text="Open OsmAnd" />
 
+        <Button
+            android:id="@+id/btnRivers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rivers &amp; graphs" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"

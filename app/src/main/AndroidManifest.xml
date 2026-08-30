@@ -49,6 +49,9 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".RiversActivity" android:exported="false" />
+        <activity android:name=".RiverDetailActivity" android:exported="false" />
+
         <service
             android:name=".RiverService"
             android:exported="false"

@@ -35,6 +35,9 @@ class MainActivity : AppCompatActivity() {
             send(RiverService.ACTION_STOP)
         }
         findViewById<Button>(R.id.btnOpenOsmAnd).setOnClickListener { openOsmAnd() }
+        findViewById<Button>(R.id.btnRivers).setOnClickListener {
+            startActivity(Intent(this, RiversActivity::class.java))
+        }
 
         setupSettingsControls()
         checkOsmAnd()
