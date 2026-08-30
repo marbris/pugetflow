@@ -36,7 +36,7 @@ class RiverDetailActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.txtTitle).text = name
         status = findViewById(R.id.txtStatus)
-        findViewById<Button>(R.id.btnOpenOsmAnd).setOnClickListener { openOsmAnd() }
+        findViewById<Button>(R.id.btnOpenOsmAnd).setOnClickListener { showOnlyTheseInOsmAnd() }
 
         load(name, seed)
     }
@@ -44,15 +44,14 @@ class RiverDetailActivity : AppCompatActivity() {
     private fun load(name: String, seed: String) {
         io.execute {
             try {
-                val sites = NldiClient.mainstemSites(seed)
+                val sites = NldiClient.riverSites(seed)          // upstream + downstream
                 val readings = UsgsClient.fetch(sites)
                 if (readings.isEmpty()) {
                     runOnUiThread { status.text = "No active USGS gauges found for this river." }
                     return@execute
                 }
-                // Anchor the flowline at the seed (fall back to any reading).
                 val anchor = readings.firstOrNull { it.siteId == seed } ?: readings.first()
-                val path = NldiClient.mainstemPath(seed, anchor.lat, anchor.lon)
+                val path = NldiClient.riverPath(seed)            // whole river, mouth → headwaters
 
                 // Place each gauge along the river (fallback: straight-line from anchor).
                 data class P(val km: Double, val r: RiverReading)
@@ -66,11 +65,8 @@ class RiverDetailActivity : AppCompatActivity() {
                 val tempPts = placed.map { it.km to it.r.tempC?.let { c -> if (useF) c * 9 / 5 + 32 else c } }
                 val flowPts = placed.map { it.km to it.r.flowCfs }
 
+                // Remember which gauges belong to this river (used by the OsmAnd button).
                 addedIds = placed.map { it.r.siteId }
-                // Make the river's gauges visible/findable in OsmAnd.
-                Settings.addSites(addedIds)
-                sendToService(RiverService.ACTION_START)
-                sendToService(RiverService.ACTION_REFRESH)
 
                 val listing = buildString {
                     for (p in placed) {
@@ -81,7 +77,7 @@ class RiverDetailActivity : AppCompatActivity() {
                 }
 
                 runOnUiThread {
-                    status.text = "${placed.size} gauges · river length ${"%.0f".format(path.lengthKm)} km · added to OsmAnd"
+                    status.text = "${placed.size} gauges · river length ${"%.0f".format(path.lengthKm)} km"
                     findViewById<GraphView>(R.id.graphTemp).setData(
                         tempPts, "Water temperature (${if (useF) "°F" else "°C"})",
                         if (useF) "°F" else "°C", Color.rgb(230, 74, 25)
@@ -102,10 +98,18 @@ class RiverDetailActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc) else startService(svc)
     }
 
-    private fun openOsmAnd() {
+    /** Replace the map's gauges with just this river's, then open OsmAnd. */
+    private fun showOnlyTheseInOsmAnd() {
+        if (addedIds.isEmpty()) {
+            Toast.makeText(this, "Still loading the river…", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Settings.setActiveSites(addedIds)       // replace, not add
+        sendToService(RiverService.ACTION_START)
+        sendToService(RiverService.ACTION_RESET) // clear old points + redraw only these
         val pkg = OsmAndBridge(this).osmandPackage()
         if (pkg == null) {
-            Toast.makeText(this, "OsmAnd not installed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Added — but OsmAnd isn't installed", Toast.LENGTH_SHORT).show()
             return
         }
         packageManager.getLaunchIntentForPackage(pkg)?.let { startActivity(it) }

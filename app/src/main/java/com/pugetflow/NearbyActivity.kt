@@ -11,26 +11,31 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.util.concurrent.Executors
-import kotlin.math.cos
 import kotlin.math.PI
+import kotlin.math.cos
 
 /**
- * Entry point for "long-press a spot in OsmAnd → Share → PugetFlow".
- * Parses the shared coordinate, queries USGS for every active gauge within a
- * box around it, and lets the user add a selection to the live map layer.
+ * Discovery hub: reached by "long-press in OsmAnd → Share → PugetFlow", or from
+ * "Rivers near me" (current GPS). Finds USGS gauges in a box around the point,
+ * groups them into rivers, and lets you profile a river (NLDI up+downstream) or
+ * add the raw gauges to the map.
  */
 class NearbyActivity : AppCompatActivity() {
 
-    private val io = Executors.newSingleThreadExecutor()
+    companion object {
+        const val EXTRA_LAT = "lat"
+        const val EXTRA_LON = "lon"
+    }
 
+    private val io = Executors.newSingleThreadExecutor()
     private lateinit var list: ListView
     private lateinit var subtitle: TextView
 
-    // Parallel to the ListView rows.
-    private val rowSiteIds = ArrayList<String>()
-    private val rowLabels = ArrayList<String>()
+    private val rowRiverNames = ArrayList<String>()
+    private val rowSeedIds = ArrayList<String>()   // a gauge on that river to seed NLDI
+    private var allSiteIds: List<String> = emptyList()
 
-    private val radiusKm = 20.0
+    private val radiusKm = 25.0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,9 +44,14 @@ class NearbyActivity : AppCompatActivity() {
 
         list = findViewById(R.id.list)
         subtitle = findViewById(R.id.txtSubtitle)
+        findViewById<Button>(R.id.btnAdd).setOnClickListener { addAllGauges() }
 
-        findViewById<Button>(R.id.btnSelectAll).setOnClickListener { selectAll() }
-        findViewById<Button>(R.id.btnAdd).setOnClickListener { addSelected() }
+        list.setOnItemClickListener { _, _, pos, _ ->
+            startActivity(Intent(this, RiverDetailActivity::class.java).apply {
+                putExtra(RiverDetailActivity.EXTRA_NAME, rowRiverNames[pos])
+                putExtra(RiverDetailActivity.EXTRA_SEED, rowSeedIds[pos])
+            })
+        }
 
         val coord = parseCoordinate(intent)
         if (coord == null) {
@@ -59,10 +69,8 @@ class NearbyActivity : AppCompatActivity() {
         io.execute {
             try {
                 val readings = UsgsClient.fetchByBBox(lon - dLon, lat - dLat, lon + dLon, lat + dLat)
-                val already = Settings.activeSites()
-                // Nearest first.
                 val sorted = readings.sortedBy { haversineKm(lat, lon, it.lat, it.lon) }
-                runOnUiThread { showResults(sorted, already) }
+                runOnUiThread { showRivers(sorted) }
             } catch (e: Exception) {
                 runOnUiThread {
                     Toast.makeText(this, "Lookup failed: ${e.message}", Toast.LENGTH_LONG).show()
@@ -72,53 +80,55 @@ class NearbyActivity : AppCompatActivity() {
         }
     }
 
-    private fun showResults(readings: List<RiverReading>, already: Set<String>) {
-        rowSiteIds.clear()
-        rowLabels.clear()
+    private fun showRivers(readings: List<RiverReading>) {
+        allSiteIds = readings.map { it.siteId }
+        // Group by river/creek name; keep the nearest gauge as the group's seed.
+        val order = LinkedHashMap<String, String>()   // display name -> seed site id (first = nearest)
+        val counts = LinkedHashMap<String, Int>()
         for (r in readings) {
-            rowSiteIds.add(r.siteId)
-            val flow = r.flowCfs?.let { "${fmt(it)} cfs" } ?: "—"
-            val temp = r.tempC?.let { " · ${Settings.formatTemp(it)}" } ?: ""
-            val shown = if (already.contains(r.siteId)) "  ✓ already added" else ""
-            rowLabels.add("${r.name}\n$flow$temp$shown")
+            val name = riverDisplayName(r.name)
+            val key = name.lowercase()
+            if (!order.containsKey(key)) order[key] = r.siteId
+            counts[key] = (counts[key] ?: 0) + 1
         }
 
-        if (rowLabels.isEmpty()) {
-            subtitle.text = "No active USGS gauges found within ${radiusKm.toInt()} km."
+        rowRiverNames.clear(); rowSeedIds.clear()
+        val labels = ArrayList<String>()
+        for ((key, seed) in order) {
+            val display = riverDisplayName(readings.first { it.siteId == seed }.name)
+            rowRiverNames.add(display)
+            rowSeedIds.add(seed)
+            labels.add("$display   (${counts[key]} gauge${if (counts[key] == 1) "" else "s"} nearby)")
+        }
+
+        if (labels.isEmpty()) {
+            subtitle.text = "No active USGS gauges within ${radiusKm.toInt()} km."
             return
         }
-        subtitle.text = "${rowLabels.size} gauge(s) nearby — tap to select, then Add."
-
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_multiple_choice, rowLabels)
-        list.adapter = adapter
-        // Pre-check the ones not yet added, so a single "Add" grabs the new ones.
-        for (i in rowSiteIds.indices) {
-            list.setItemChecked(i, !already.contains(rowSiteIds[i]))
-        }
+        subtitle.text = "${labels.size} river(s) nearby — tap one to see its flow/temp profile."
+        list.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, labels)
     }
 
-    private fun selectAll() {
-        for (i in rowSiteIds.indices) list.setItemChecked(i, true)
-    }
-
-    private fun addSelected() {
-        val checked = list.checkedItemPositions
-        val ids = ArrayList<String>()
-        for (i in rowSiteIds.indices) {
-            if (checked.get(i, false)) ids.add(rowSiteIds[i])
-        }
-        if (ids.isEmpty()) {
-            Toast.makeText(this, "Nothing selected.", Toast.LENGTH_SHORT).show()
-            return
-        }
-        Settings.addSites(ids)
-        // Ensure live updates are running, then force an immediate refresh so the
-        // new points appear now (START alone won't re-fetch if already running).
+    private fun addAllGauges() {
+        if (allSiteIds.isEmpty()) return
+        Settings.addSites(allSiteIds)
         sendToService(RiverService.ACTION_START)
         sendToService(RiverService.ACTION_REFRESH)
-        Toast.makeText(this, "Added ${ids.size} gauge(s). Opening OsmAnd…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Added ${allSiteIds.size} gauge(s) to the map.", Toast.LENGTH_SHORT).show()
         openOsmAnd()
         finish()
+    }
+
+    /** "Cedar River at Renton" -> "Cedar River"; "Big Soos Creek above ..." -> "Big Soos Creek". */
+    private fun riverDisplayName(siteName: String): String {
+        val lower = siteName.lowercase()
+        val markers = listOf(" at ", " near ", " nr ", " below ", " blw ", " above ", " abv ", " a ")
+        var cut = siteName.length
+        for (m in markers) {
+            val idx = lower.indexOf(m)
+            if (idx in 0 until cut) cut = idx
+        }
+        return siteName.substring(0, cut).trim().ifEmpty { siteName }
     }
 
     private fun sendToService(action: String) {
@@ -133,27 +143,22 @@ class NearbyActivity : AppCompatActivity() {
 
     // --- coordinate parsing ---
 
-    /** Handles geo: VIEW intents and OsmAnd's shared text (geo: URI + osmand.net link). */
     private fun parseCoordinate(intent: Intent?): Pair<Double, Double>? {
         if (intent == null) return null
-
-        // 1) geo: VIEW intent, e.g. geo:47.60,-122.33?z=15
-        (intent.data)?.let { uri ->
-            fromGeoUri(uri)?.let { return it }
+        // 0) explicit extras (from "Rivers near me")
+        if (intent.hasExtra(EXTRA_LAT) && intent.hasExtra(EXTRA_LON)) {
+            return intent.getDoubleExtra(EXTRA_LAT, 0.0) to intent.getDoubleExtra(EXTRA_LON, 0.0)
         }
-
-        // 2) Shared text (ACTION_SEND).
+        // 1) geo: VIEW intent
+        intent.data?.let { uri -> fromGeoUri(uri)?.let { return it } }
+        // 2) shared text (ACTION_SEND)
         val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
-
-        // 2a) geo: inside the text
         Regex("""geo:(-?\d+\.\d+),(-?\d+\.\d+)""").find(text)?.let { m ->
             return m.groupValues[1].toDouble() to m.groupValues[2].toDouble()
         }
-        // 2b) osmand.net/go?lat=..&lon=..
         val lat = Regex("""[?&]lat=(-?\d+\.\d+)""").find(text)?.groupValues?.get(1)?.toDoubleOrNull()
         val lon = Regex("""[?&]lon=(-?\d+\.\d+)""").find(text)?.groupValues?.get(1)?.toDoubleOrNull()
         if (lat != null && lon != null) return lat to lon
-        // 2c) bare "lat, lon" pair
         Regex("""(-?\d{1,3}\.\d+)[,\s]+(-?\d{1,3}\.\d+)""").find(text)?.let { m ->
             return m.groupValues[1].toDouble() to m.groupValues[2].toDouble()
         }
@@ -162,12 +167,11 @@ class NearbyActivity : AppCompatActivity() {
 
     private fun fromGeoUri(uri: Uri): Pair<Double, Double>? {
         if (uri.scheme != "geo") return null
-        val ssp = uri.schemeSpecificPart ?: return null           // "47.60,-122.33?z=15"
+        val ssp = uri.schemeSpecificPart ?: return null
         val coords = ssp.substringBefore("?").split(",")
         if (coords.size < 2) return null
         val lat = coords[0].trim().toDoubleOrNull() ?: return null
         val lon = coords[1].trim().toDoubleOrNull() ?: return null
-        // geo:0,0?q=lat,lon form:
         if (lat == 0.0 && lon == 0.0) {
             uri.query?.let { q ->
                 Regex("""(-?\d+\.\d+),(-?\d+\.\d+)""").find(q)?.let { m ->
@@ -180,16 +184,13 @@ class NearbyActivity : AppCompatActivity() {
 
     private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val r = 6371.0
-        val dLat = (lat2 - lat1) * PI / 180.0
-        val dLon = (lon2 - lon1) * PI / 180.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
         val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * PI / 180.0) * Math.cos(lat2 * PI / 180.0) *
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
                 Math.sin(dLon / 2) * Math.sin(dLon / 2)
         return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     }
-
-    private fun fmt(v: Double): String =
-        if (v >= 100 || v == Math.floor(v)) v.toLong().toString() else String.format("%.1f", v)
 
     override fun onDestroy() {
         io.shutdownNow()

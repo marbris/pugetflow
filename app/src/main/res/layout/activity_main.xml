@@ -54,6 +54,12 @@
             android:layout_height="wrap_content"
             android:text="Rivers &amp; graphs" />
 
+        <Button
+            android:id="@+id/btnNearMe"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rivers near me" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"

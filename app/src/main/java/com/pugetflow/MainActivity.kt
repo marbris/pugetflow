@@ -1,8 +1,10 @@
 package com.pugetflow
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Button
@@ -15,6 +17,7 @@ import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
+    private val reqLocation = 200
     private lateinit var status: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +41,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnRivers).setOnClickListener {
             startActivity(Intent(this, RiversActivity::class.java))
         }
+        findViewById<Button>(R.id.btnNearMe).setOnClickListener { riversNearMe() }
 
         setupSettingsControls()
         checkOsmAnd()
@@ -114,6 +118,46 @@ class MainActivity : AppCompatActivity() {
             != PackageManager.PERMISSION_GRANTED
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
+        }
+    }
+
+    private fun riversNearMe() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), reqLocation)
+            return
+        }
+        openNearMe()
+    }
+
+    private fun openNearMe() {
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val loc = try {
+            listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER
+            ).mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+                .maxByOrNull { it.time }
+        } catch (_: SecurityException) { null }
+
+        if (loc == null) {
+            Toast.makeText(this, "No recent location fix. Open a maps app briefly, then retry.", Toast.LENGTH_LONG).show()
+            return
+        }
+        startActivity(Intent(this, NearbyActivity::class.java).apply {
+            putExtra(NearbyActivity.EXTRA_LAT, loc.latitude)
+            putExtra(NearbyActivity.EXTRA_LON, loc.longitude)
+        })
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == reqLocation &&
+            grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        ) {
+            openNearMe()
         }
     }
 }

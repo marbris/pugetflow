@@ -49,6 +49,11 @@ object Settings {
         prefs?.edit()?.putStringSet(KEY_SITES, set)?.apply()
     }
 
+    /** Replace the whole active set (used by "show only this river's gauges"). */
+    fun setActiveSites(ids: Collection<String>) {
+        prefs?.edit()?.putStringSet(KEY_SITES, LinkedHashSet(ids))?.apply()
+    }
+
     fun removeSite(id: String) {
         val set = activeSites()
         if (set.remove(id)) prefs?.edit()?.putStringSet(KEY_SITES, set)?.apply()

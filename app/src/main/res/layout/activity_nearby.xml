@@ -9,7 +9,7 @@
         android:id="@+id/txtTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Nearby gauges"
+        android:text="Rivers near here"
         android:textSize="20sp"
         android:textStyle="bold"
         android:paddingBottom="4dp" />
@@ -26,27 +26,12 @@
         android:id="@+id/list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:choiceMode="multipleChoice" />
+        android:layout_weight="1" />
 
-    <LinearLayout
+    <Button
+        android:id="@+id/btnAdd"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="8dp">
-
-        <Button
-            android:id="@+id/btnSelectAll"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Select all" />
-
-        <Button
-            android:id="@+id/btnAdd"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Add selected" />
-    </LinearLayout>
+        android:layout_marginTop="8dp"
+        android:text="Or: add all these gauges to the map" />
 </LinearLayout>

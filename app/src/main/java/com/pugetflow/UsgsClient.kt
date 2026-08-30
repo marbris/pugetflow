@@ -103,7 +103,7 @@ object UsgsClient {
                 acc.name = src.optString("siteName", acc.name)
                 acc.lat = geo.getDouble("latitude")
                 acc.lon = geo.getDouble("longitude")
-                latest.optString("dateTime", null)?.let { acc.updated = it }
+                if (latest.has("dateTime")) acc.updated = latest.optString("dateTime")
 
                 when (varCode) {
                     P_FLOW -> acc.flow = v
