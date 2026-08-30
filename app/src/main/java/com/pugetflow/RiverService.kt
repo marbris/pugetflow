@@ -29,6 +29,7 @@ class RiverService : Service() {
         const val ACTION_START = "com.pugetflow.START"
         const val ACTION_REFRESH = "com.pugetflow.REFRESH"
         const val ACTION_STOP = "com.pugetflow.STOP"
+        const val ACTION_RESET = "com.pugetflow.RESET"
 
         private const val CHANNEL_ID = "river_updates"
         private const val NOTIF_ID = 42
@@ -75,6 +76,13 @@ class RiverService : Service() {
                 ensureForeground()
                 refresh()
             }
+            ACTION_RESET -> {
+                // Drop every point from the map, then redraw whatever is active now
+                // (used after resetting the gauge list back to defaults).
+                ensureForeground()
+                try { bridge.removeLayer() } catch (_: Exception) {}
+                refresh()
+            }
             else -> { // ACTION_START or null
                 if (!running) {
                     running = true
@@ -95,7 +103,7 @@ class RiverService : Service() {
         setStatus("Refreshing…")
         io.execute {
             try {
-                val readings = UsgsClient.fetch(Sites.SITE_IDS)
+                val readings = UsgsClient.fetch(Settings.activeSites().toList())
                 main.post {
                     if (!bridge.isConnected) bridge.bind()
                     bridge.publish(readings)

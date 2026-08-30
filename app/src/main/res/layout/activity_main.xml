@@ -95,6 +95,20 @@
                 android:text="Flow rate" />
         </RadioGroup>
 
+        <Button
+            android:id="@+id/btnResetGauges"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Reset gauges to default list" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Add gauges by long-pressing a spot in OsmAnd → Share → PugetFlow."
+            android:textSize="12sp"
+            android:paddingTop="4dp" />
+
         <TextView
             android:id="@+id/txtStatus"
             android:layout_width="match_parent"

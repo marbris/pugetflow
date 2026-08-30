@@ -57,6 +57,12 @@ class MainActivity : AppCompatActivity() {
                 Settings.ColorMode.FLOW else Settings.ColorMode.TEMPERATURE
             reRenderPoints()
         }
+
+        findViewById<Button>(R.id.btnResetGauges).setOnClickListener {
+            Settings.resetSites()
+            send(RiverService.ACTION_RESET)
+            Toast.makeText(this, "Gauge list reset to defaults.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /** Re-push points so OsmAnd reflects the new unit/colour immediately. */

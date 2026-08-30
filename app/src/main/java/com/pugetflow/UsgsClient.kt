@@ -23,12 +23,26 @@ object UsgsClient {
 
     /** Returns one RiverReading per site that reported data, keyed/ordered arbitrarily. */
     fun fetch(siteIds: List<String>): List<RiverReading> {
+        if (siteIds.isEmpty()) return emptyList()
         val url = BASE + "?format=json" +
                 "&sites=" + siteIds.joinToString(",") +
                 "&parameterCd=$P_FLOW,$P_GAGE,$P_TEMP" +
                 "&siteStatus=active"
         val body = get(url)
         return parse(body)
+    }
+
+    /**
+     * All active gauges within a lat/lon bounding box. Box order is USGS's:
+     * west,south,east,north (minLon, minLat, maxLon, maxLat).
+     */
+    fun fetchByBBox(west: Double, south: Double, east: Double, north: Double): List<RiverReading> {
+        val box = "%.5f,%.5f,%.5f,%.5f".format(west, south, east, north)
+        val url = BASE + "?format=json" +
+                "&bBox=$box" +
+                "&parameterCd=$P_FLOW,$P_GAGE,$P_TEMP" +
+                "&siteStatus=active"
+        return parse(get(url))
     }
 
     private fun get(urlStr: String): String {
@@ -66,32 +80,38 @@ object UsgsClient {
         val map = LinkedHashMap<String, Acc>()
 
         for (i in 0 until timeSeries.length()) {
-            val ts = timeSeries.getJSONObject(i)
-            val src = ts.getJSONObject("sourceInfo")
-            val siteId = src.getJSONArray("siteCode").getJSONObject(0).getString("value")
-            val acc = map.getOrPut(siteId) { Acc() }
-            acc.name = src.optString("siteName", acc.name)
-            val geo = src.getJSONObject("geoLocation").getJSONObject("geogLocation")
-            acc.lat = geo.getDouble("latitude")
-            acc.lon = geo.getDouble("longitude")
+            // Skip any malformed/odd station rather than failing the whole response.
+            try {
+                val ts = timeSeries.getJSONObject(i)
+                val src = ts.getJSONObject("sourceInfo")
+                val siteId = src.getJSONArray("siteCode").getJSONObject(0).getString("value")
+                val geo = src.getJSONObject("geoLocation").getJSONObject("geogLocation")
 
-            val varCode = ts.getJSONObject("variable")
-                .getJSONArray("variableCode").getJSONObject(0).getString("value")
+                val varCode = ts.getJSONObject("variable")
+                    .getJSONArray("variableCode").getJSONObject(0).getString("value")
 
-            val valuesOuter = ts.getJSONArray("values")
-            if (valuesOuter.length() == 0) continue
-            val values = valuesOuter.getJSONObject(0).getJSONArray("value")
-            if (values.length() == 0) continue
-            val latest = values.getJSONObject(values.length() - 1)
-            val v = latest.optString("value").toDoubleOrNull() ?: continue
-            if (v == NO_DATA) continue
-            val dt = latest.optString("dateTime", null)
-            if (dt != null) acc.updated = dt
+                val valuesOuter = ts.getJSONArray("values")
+                if (valuesOuter.length() == 0) continue
+                val values = valuesOuter.getJSONObject(0).getJSONArray("value")
+                if (values.length() == 0) continue
+                val latest = values.getJSONObject(values.length() - 1)
+                val v = latest.optString("value").toDoubleOrNull() ?: continue
+                if (v == NO_DATA) continue
 
-            when (varCode) {
-                P_FLOW -> acc.flow = v
-                P_GAGE -> acc.gage = v
-                P_TEMP -> acc.temp = v
+                // Only record the site once we have a usable value for it.
+                val acc = map.getOrPut(siteId) { Acc() }
+                acc.name = src.optString("siteName", acc.name)
+                acc.lat = geo.getDouble("latitude")
+                acc.lon = geo.getDouble("longitude")
+                latest.optString("dateTime", null)?.let { acc.updated = it }
+
+                when (varCode) {
+                    P_FLOW -> acc.flow = v
+                    P_GAGE -> acc.gage = v
+                    P_TEMP -> acc.temp = v
+                }
+            } catch (_: Exception) {
+                // Ignore this time-series and keep going.
             }
         }
 

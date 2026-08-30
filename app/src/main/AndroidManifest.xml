@@ -30,6 +30,25 @@
             </intent-filter>
         </activity>
 
+        <!-- Receives a location shared from OsmAnd (long-press → Share) to add nearby gauges. -->
+        <activity
+            android:name=".NearbyActivity"
+            android:exported="true"
+            android:label="PugetFlow: add gauges"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="geo" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".RiverService"
             android:exported="false"
