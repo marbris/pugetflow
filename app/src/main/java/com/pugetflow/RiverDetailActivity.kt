@@ -30,6 +30,7 @@ class RiverDetailActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Settings.init(this)
         setContentView(R.layout.activity_river_detail)
+        findViewById<android.view.View>(R.id.root).applySystemBarInsets()
 
         val name = intent.getStringExtra(EXTRA_NAME) ?: "River"
         val seed = intent.getStringExtra(EXTRA_SEED) ?: run { finish(); return }

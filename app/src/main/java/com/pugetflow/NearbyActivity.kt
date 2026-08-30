@@ -41,6 +41,7 @@ class NearbyActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Settings.init(this)
         setContentView(R.layout.activity_nearby)
+        findViewById<android.view.View>(R.id.root).applySystemBarInsets()
 
         list = findViewById(R.id.list)
         subtitle = findViewById(R.id.txtSubtitle)

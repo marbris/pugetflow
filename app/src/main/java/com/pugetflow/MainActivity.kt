@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Settings.init(this)
         setContentView(R.layout.activity_main)
+        findViewById<android.view.View>(R.id.root).applySystemBarInsets()
 
         status = findViewById(R.id.txtStatus)
 

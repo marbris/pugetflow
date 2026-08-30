@@ -12,6 +12,7 @@ class RiversActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_rivers)
+        findViewById<android.view.View>(R.id.root).applySystemBarInsets()
 
         val rivers = RiverCatalog.RIVERS
         val list = findViewById<ListView>(R.id.list)
