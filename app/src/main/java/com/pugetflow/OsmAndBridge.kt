@@ -145,12 +145,15 @@ class OsmAndBridge(private val context: Context) {
         val details = ArrayList<String>()
         r.flowCfs?.let { details.add("Flow: ${fmt(it)} ft³/s") }
         r.gageFt?.let { details.add("Gage height: ${fmt(it)} ft") }
-        r.tempC?.let { details.add("Water temp: ${fmt(it)} °C") }
+        r.tempC?.let { details.add("Water temp: ${Settings.formatTemp(it)}") }
         r.updated?.let { details.add("Updated: ${prettyTime(it)}") }
 
         val shortName = r.name.firstOrNull { it.isLetter() }?.uppercase() ?: "R"
         val typeName = "USGS ${r.siteId}"
-        val color = colorForTemp(r.tempC)
+        val color = when (Settings.colorMode) {
+            Settings.ColorMode.FLOW -> colorForFlow(r.flowCfs)
+            Settings.ColorMode.TEMPERATURE -> colorForTemp(r.tempC)
+        }
         val location = ALatLon(r.lat, r.lon)
 
         return AMapPoint(
@@ -176,6 +179,19 @@ class OsmAndBridge(private val context: Context) {
             tempC < 19 -> Color.rgb(124, 179, 66)  // green
             tempC < 22 -> Color.rgb(251, 140, 0)   // orange
             else -> Color.rgb(211, 47, 47)         // red (fish-stress warm)
+        }
+    }
+
+    /** Low → high flow ramp (log-ish bands); grey when no discharge is reported. */
+    private fun colorForFlow(cfs: Double?): Int {
+        if (cfs == null) return Color.rgb(96, 125, 139) // blue-grey
+        return when {
+            cfs < 10 -> Color.rgb(13, 71, 161)     // deep blue (very low)
+            cfs < 30 -> Color.rgb(2, 136, 209)     // blue
+            cfs < 75 -> Color.rgb(0, 150, 136)     // teal
+            cfs < 150 -> Color.rgb(124, 179, 66)   // green
+            cfs < 400 -> Color.rgb(251, 140, 0)    // orange
+            else -> Color.rgb(211, 47, 47)         // red (high / flood)
         }
     }
 

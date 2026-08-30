@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Button
+import android.widget.CompoundButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -17,6 +19,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Settings.init(this)
         setContentView(R.layout.activity_main)
 
         status = findViewById(R.id.txtStatus)
@@ -33,7 +36,32 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnOpenOsmAnd).setOnClickListener { openOsmAnd() }
 
+        setupSettingsControls()
         checkOsmAnd()
+    }
+
+    private fun setupSettingsControls() {
+        val swF = findViewById<CompoundButton>(R.id.swFahrenheit)
+        swF.isChecked = Settings.useFahrenheit
+        swF.setOnCheckedChangeListener { _, checked ->
+            Settings.useFahrenheit = checked
+            reRenderPoints()
+        }
+
+        val rg = findViewById<RadioGroup>(R.id.rgColorMode)
+        val initial = if (Settings.colorMode == Settings.ColorMode.FLOW)
+            R.id.rbColorFlow else R.id.rbColorTemp
+        rg.check(initial)
+        rg.setOnCheckedChangeListener { _, checkedId ->
+            Settings.colorMode = if (checkedId == R.id.rbColorFlow)
+                Settings.ColorMode.FLOW else Settings.ColorMode.TEMPERATURE
+            reRenderPoints()
+        }
+    }
+
+    /** Re-push points so OsmAnd reflects the new unit/colour immediately. */
+    private fun reRenderPoints() {
+        send(RiverService.ACTION_REFRESH)
     }
 
     override fun onResume() {

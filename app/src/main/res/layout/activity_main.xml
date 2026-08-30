@@ -48,6 +48,53 @@
             android:layout_height="wrap_content"
             android:text="Open OsmAnd" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:background="#33888888" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Settings"
+            android:textStyle="bold"
+            android:paddingBottom="4dp" />
+
+        <Switch
+            android:id="@+id/swFahrenheit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingVertical="8dp"
+            android:text="Show temperature in °F" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Color points by:"
+            android:paddingTop="8dp" />
+
+        <RadioGroup
+            android:id="@+id/rgColorMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbColorTemp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Temperature" />
+
+            <RadioButton
+                android:id="@+id/rbColorFlow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="Flow rate" />
+        </RadioGroup>
+
         <TextView
             android:id="@+id/txtStatus"
             android:layout_width="match_parent"

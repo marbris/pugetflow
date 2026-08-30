@@ -57,6 +57,7 @@ class RiverService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Settings.init(this)
         createChannel()
         bridge = OsmAndBridge(this)
     }
@@ -101,7 +102,7 @@ class RiverService : Service() {
                     val stamp = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
                     val lines = readings.joinToString("\n") { r ->
                         val flow = r.flowCfs?.let { "${fmt(it)} cfs" } ?: "—"
-                        val temp = r.tempC?.let { " · ${fmt(it)}°C" } ?: ""
+                        val temp = r.tempC?.let { " · ${Settings.formatTemp(it)}" } ?: ""
                         "• ${r.name}: $flow$temp"
                     }
                     setStatus("Updated $stamp — ${readings.size} sites\n$lines")
