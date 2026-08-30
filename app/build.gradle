@@ -1,0 +1,67 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+
+// Signing material is supplied via environment variables in CI (see .github/workflows).
+// When absent (e.g. a local debug build) the release signing config is simply skipped.
+def ksFile = System.getenv("KEYSTORE_FILE")
+def hasKeystore = ksFile != null && !ksFile.isEmpty()
+
+android {
+    namespace = "com.pugetflow"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.pugetflow"
+        minSdkVersion 24
+        targetSdkVersion 35
+        // Overridable in CI so every release gets a higher versionCode (required
+        // for Obtainium / Android to accept an update).
+        versionCode (System.getenv("APK_VERSION_CODE") ?: "1").toInteger()
+        versionName (System.getenv("APK_VERSION") ?: "1.0").toString()
+    }
+
+    signingConfigs {
+        release {
+            if (hasKeystore) {
+                storeFile file(ksFile)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        // The OsmAnd AIDL client classes ship as compiled classes inside the AAR,
+        // but enabling this keeps parity with the reference project.
+        aidl true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasKeystore) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+dependencies {
+    // OsmAnd AIDL client: provides net.osmand.aidlapi.* (IOsmAndAidlInterface, AMapLayer, AMapPoint, ...)
+    implementation "net.osmand:android-aidl-lib:master-snapshot@aar"
+
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.google.android.material:material:1.11.0"
+}

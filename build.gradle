@@ -1,0 +1,34 @@
+// Top-level build file. Repository setup mirrors the official osmand-api-demo,
+// which is required so Gradle can resolve `net.osmand:android-aidl-lib` from
+// OsmAnd's Ivy repository.
+buildscript {
+    ext.kotlin_version = '2.0.0'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.1'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+allprojects {
+    repositories {
+        // OsmAnd publishes the AIDL client library here (android-aidl-lib).
+        ivy {
+            name = "OsmAndBinariesIvy"
+            url = "https://builder.osmand.net"
+            patternLayout {
+                artifact "ivy/[organisation]/[module]/[revision]/[artifact]-[revision](-[classifier]).[ext]"
+            }
+        }
+        google()
+        mavenCentral()
+        maven { url "https://jitpack.io" }
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
+}
