@@ -14,8 +14,9 @@ import net.osmand.aidlapi.map.ALatLon
 import net.osmand.aidlapi.maplayer.AMapLayer
 import net.osmand.aidlapi.maplayer.AddMapLayerParams
 import net.osmand.aidlapi.maplayer.RemoveMapLayerParams
-import net.osmand.aidlapi.maplayer.UpdateMapLayerParams
 import net.osmand.aidlapi.maplayer.point.AMapPoint
+import net.osmand.aidlapi.maplayer.point.AddMapPointParams
+import net.osmand.aidlapi.maplayer.point.UpdateMapPointParams
 
 /**
  * Wraps the OsmAnd AIDL service: binds to it, and publishes a custom map layer
@@ -38,6 +39,7 @@ class OsmAndBridge(private val context: Context) {
 
     private var api: IOsmAndAidlInterface? = null
     private var layerAdded = false
+    private val addedPointIds = HashSet<String>()
     private var pending: List<RiverReading>? = null
 
     /** Invoked on the binder thread once the service connects. */
@@ -57,6 +59,7 @@ class OsmAndBridge(private val context: Context) {
         override fun onServiceDisconnected(name: ComponentName?) {
             api = null
             layerAdded = false
+            addedPointIds.clear()
         }
     }
 
@@ -90,6 +93,7 @@ class OsmAndBridge(private val context: Context) {
         }
         api = null
         layerAdded = false
+        addedPointIds.clear()
     }
 
     /**
@@ -102,19 +106,28 @@ class OsmAndBridge(private val context: Context) {
             pending = readings
             return
         }
-        val points = ArrayList<AMapPoint>(readings.size)
-        for (r in readings) points.add(toPoint(r))
-        val layer = AMapLayer(LAYER_ID, LAYER_NAME, 5.5f, points)
         try {
+            // The layer must exist first; points embedded in the AMapLayer are NOT
+            // drawn — each point has to be added/updated individually (this matches
+            // OsmAnd's own API and the osmand-api-demo).
             if (!layerAdded) {
-                a.addMapLayer(AddMapLayerParams(layer))
+                val empty = AMapLayer(LAYER_ID, LAYER_NAME, 5.5f, ArrayList<AMapPoint>())
+                a.addMapLayer(AddMapLayerParams(empty))
                 layerAdded = true
-            } else {
-                a.updateMapLayer(UpdateMapLayerParams(layer))
+                addedPointIds.clear()
+            }
+            for (r in readings) {
+                val point = toPoint(r)
+                if (addedPointIds.add(r.siteId)) {
+                    a.addMapPoint(AddMapPointParams(LAYER_ID, point))
+                } else {
+                    a.updateMapPoint(UpdateMapPointParams(LAYER_ID, point, false))
+                }
             }
         } catch (e: RemoteException) {
             // OsmAnd process may have died; force a re-add next time.
             layerAdded = false
+            addedPointIds.clear()
         }
     }
 
@@ -125,6 +138,7 @@ class OsmAndBridge(private val context: Context) {
         } catch (_: RemoteException) {
         }
         layerAdded = false
+        addedPointIds.clear()
     }
 
     private fun toPoint(r: RiverReading): AMapPoint {
