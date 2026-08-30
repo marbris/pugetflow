@@ -6,6 +6,11 @@ apply plugin: 'kotlin-android'
 def ksFile = System.getenv("KEYSTORE_FILE")
 def hasKeystore = ksFile != null && !ksFile.isEmpty()
 
+// Computed into locals to avoid Groovy parsing `versionCode (x).toInteger()`
+// as a chained call on the setter's return value.
+def appVersionCode = (System.getenv("APK_VERSION_CODE") ?: "1").toInteger()
+def appVersionName = (System.getenv("APK_VERSION") ?: "1.0").toString()
+
 android {
     namespace = "com.pugetflow"
     compileSdk 35
@@ -16,8 +21,8 @@ android {
         targetSdkVersion 35
         // Overridable in CI so every release gets a higher versionCode (required
         // for Obtainium / Android to accept an update).
-        versionCode (System.getenv("APK_VERSION_CODE") ?: "1").toInteger()
-        versionName (System.getenv("APK_VERSION") ?: "1.0").toString()
+        versionCode appVersionCode
+        versionName appVersionName
     }
 
     signingConfigs {
